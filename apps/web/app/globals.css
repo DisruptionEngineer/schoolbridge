@@ -1,4 +1,8 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 @import "tailwindcss";
+
+/* Scan monorepo packages for Tailwind classes */
+@source "../../packages/ui/src/**/*.{ts,tsx}";
 
 /*
  * SchoolBridge Global Styles
@@ -8,9 +12,6 @@
  *   - Light mode: cream backgrounds, amber accents, warm neutrals
  *   - Dark mode: warm chocolate/espresso tones (never cold gray)
  */
-
-/* ── Google Fonts ─────────────────────────────────────────────── */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
 /* ── CSS Custom Properties: Light Mode ────────────────────────── */
 :root {
