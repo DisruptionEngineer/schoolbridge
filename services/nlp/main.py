@@ -1,19 +1,21 @@
 """
 SchoolBridge NLP Microservice
 
-Extracts school events, dates, and photo references from ClassDojo post text.
+Extracts school events, dates, and photo references from ClassDojo post text
+and uploaded PDF documents (school newsletters, calendars, flyers).
 Uses regex-based keyword matching and dateparser for date normalization.
 Lightweight version optimized for serverless deployment.
 """
 
+import io
 import re
 from typing import Optional
 
 import dateparser
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form
 from pydantic import BaseModel
 
-app = FastAPI(title="SchoolBridge NLP Service", version="0.2.0")
+app = FastAPI(title="SchoolBridge NLP Service", version="0.3.0")
 
 SCHOOL_TERMS: dict[str, list[str]] = {
     "dismissal": ["early dismissal", "early release", "half day"],
@@ -115,78 +117,138 @@ def has_time_component(text: str) -> bool:
 @app.post("/extract", response_model=ExtractResponse)
 async def extract_events(req: ExtractRequest) -> ExtractResponse:
     """Extract school events and dates from ClassDojo post text."""
-    if not req.text.strip():
+    return _extract_from_text(req.text, req.post_id)
+
+
+def _extract_from_text(text: str, source_id: str) -> ExtractResponse:
+    """Shared extraction logic used by both /extract and /extract-pdf."""
+    if not text.strip():
         return ExtractResponse(events=[], photos=[])
 
-    category = classify_category(req.text)
-    title = extract_title(req.text)
+    # Split text into paragraphs/blocks and process each for events
+    all_events: list[ExtractedEvent] = []
+    seen_hashes: set[str] = set()
 
-    # Extract date candidates via regex
-    date_texts: list[str] = [
-        m.group() for m in DATE_EXPR.finditer(req.text)
-        if is_valid_date_text(m.group())
-    ]
+    # Process the full text as one block first
+    blocks = [text]
+    # Also split by double newlines for paragraph-level extraction
+    paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+    if len(paragraphs) > 1:
+        blocks = paragraphs
 
-    # Fallback: use dateparser's search_dates
-    if not date_texts:
-        try:
-            from dateparser.search import search_dates
-            found = search_dates(
-                req.text, settings={"PREFER_DATES_FROM": "future"}
-            ) or []
-            date_texts = [
-                text for text, _ in found if is_valid_date_text(text)
-            ]
-        except Exception:
-            pass
+    for block in blocks:
+        category = classify_category(block)
+        title = extract_title(block)
 
-    events: list[ExtractedEvent] = []
-    seen_dates: set[str] = set()
+        date_texts: list[str] = [
+            m.group() for m in DATE_EXPR.finditer(block)
+            if is_valid_date_text(m.group())
+        ]
 
-    for raw_date in date_texts:
-        if raw_date.lower() in seen_dates:
-            continue
-        seen_dates.add(raw_date.lower())
+        if not date_texts:
+            try:
+                from dateparser.search import search_dates
+                found = search_dates(
+                    block, settings={"PREFER_DATES_FROM": "future"}
+                ) or []
+                date_texts = [
+                    dt_text for dt_text, _ in found if is_valid_date_text(dt_text)
+                ]
+            except Exception:
+                pass
 
-        parsed = dateparser.parse(
-            raw_date,
-            settings={
-                "PREFER_DATES_FROM": "future",
-                "RETURN_AS_TIMEZONE_AWARE": False,
-            },
-        )
+        for raw_date in date_texts:
+            dedup = f"{title.lower()}|{raw_date.lower()}"
+            if dedup in seen_hashes:
+                continue
+            seen_hashes.add(dedup)
 
-        iso_date: Optional[str] = None
-        is_all_day = True
+            parsed = dateparser.parse(
+                raw_date,
+                settings={
+                    "PREFER_DATES_FROM": "future",
+                    "RETURN_AS_TIMEZONE_AWARE": False,
+                },
+            )
 
-        if parsed:
-            if has_time_component(raw_date):
-                is_all_day = False
-                iso_date = parsed.isoformat()
-            else:
-                iso_date = parsed.date().isoformat()
+            iso_date: Optional[str] = None
+            is_all_day = True
 
-        events.append(ExtractedEvent(
-            title=title,
-            raw_date_text=raw_date,
-            iso_date=iso_date,
-            is_all_day=is_all_day,
-            category=category,
-        ))
+            if parsed:
+                if has_time_component(raw_date):
+                    is_all_day = False
+                    iso_date = parsed.isoformat()
+                else:
+                    iso_date = parsed.date().isoformat()
 
-    # If we found school terms but no dates, still create an event with no date
-    if not events and category != "general":
-        events.append(ExtractedEvent(
-            title=title,
-            raw_date_text="(no date detected)",
-            iso_date=None,
-            is_all_day=True,
-            category=category,
-        ))
+            all_events.append(ExtractedEvent(
+                title=title,
+                raw_date_text=raw_date,
+                iso_date=iso_date,
+                is_all_day=is_all_day,
+                category=category,
+            ))
 
-    return ExtractResponse(events=events, photos=[])
+        # Category-only event with no date
+        if not date_texts and category != "general":
+            dedup = f"{title.lower()}|nodate"
+            if dedup not in seen_hashes:
+                seen_hashes.add(dedup)
+                all_events.append(ExtractedEvent(
+                    title=title,
+                    raw_date_text="(no date detected)",
+                    iso_date=None,
+                    is_all_day=True,
+                    category=category,
+                ))
+
+    return ExtractResponse(events=all_events, photos=[])
+
+
+class PDFExtractResponse(BaseModel):
+    """Response for PDF extraction — includes raw text and extracted events."""
+    text: str
+    page_count: int
+    events: list[ExtractedEvent]
+    photos: list[ExtractedPhoto]
+
+
+@app.post("/extract-pdf", response_model=PDFExtractResponse)
+async def extract_pdf(
+    file: UploadFile = File(...),
+    source_id: str = Form(default="pdf-upload"),
+):
+    """Extract school events from an uploaded PDF document.
+
+    Accepts multipart form upload of a PDF file. Extracts text from all pages,
+    then runs the same NLP event extraction pipeline used for ClassDojo posts.
+    Designed for school newsletters, calendars, and flyer PDFs.
+    """
+    from pypdf import PdfReader
+
+    contents = await file.read()
+    reader = PdfReader(io.BytesIO(contents))
+
+    pages_text: list[str] = []
+    for page in reader.pages:
+        page_text = page.extract_text() or ""
+        if page_text.strip():
+            pages_text.append(page_text.strip())
+
+    full_text = "\n\n".join(pages_text)
+    page_count = len(reader.pages)
+
+    # Run standard event extraction on the full PDF text
+    result = _extract_from_text(full_text, source_id)
+
+    return PDFExtractResponse(
+        text=full_text[:5000],  # Cap raw text at 5KB for response
+        page_count=page_count,
+        events=result.events,
+        photos=result.photos,
+    )
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "engine": "regex+dateparser"}
+    return {"status": "ok", "engine": "regex+dateparser+pdf"}
