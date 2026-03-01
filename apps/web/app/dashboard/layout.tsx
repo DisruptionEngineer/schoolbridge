@@ -1,13 +1,17 @@
+import { cookies } from "next/headers";
 import { createServerClient } from "@schoolbridge/db";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "./shell";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClient(cookieStore);
   const {
     data: { user },
   } = await supabase.auth.getUser();

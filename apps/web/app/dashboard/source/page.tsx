@@ -1,10 +1,12 @@
+import { cookies } from "next/headers";
 import { createServerClient } from "@schoolbridge/db";
 import { SourceConfigForm } from "./source-form";
 
 export const metadata = { title: "ClassDojo Source – SchoolBridge" };
 
 export default async function SourcePage() {
-  const supabase = await createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClient(cookieStore);
 
   const { data: sources } = await supabase
     .from("classdojo_sources")

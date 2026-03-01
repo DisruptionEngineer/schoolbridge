@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { createServerClient } from "@schoolbridge/db";
 
 export const metadata = { title: "Photos – SchoolBridge" };
 
 export default async function PhotosPage() {
-  const supabase = await createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClient(cookieStore);
   const { data: user } = await supabase.auth.getUser();
   const tenantId = user.user?.app_metadata?.tenant_id;
 

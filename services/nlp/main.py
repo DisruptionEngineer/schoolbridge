@@ -2,23 +2,18 @@
 SchoolBridge NLP Microservice
 
 Extracts school events, dates, and photo references from ClassDojo post text.
-Uses spaCy for NER + PhraseMatcher and dateparser for date normalization.
+Uses regex-based keyword matching and dateparser for date normalization.
+Lightweight version optimized for serverless deployment.
 """
 
 import re
 from typing import Optional
 
 import dateparser
-import spacy
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from spacy.matcher import PhraseMatcher
 
-app = FastAPI(title="SchoolBridge NLP Service", version="0.1.0")
-
-# Load spaCy model and set up matchers
-nlp = spacy.load("en_core_web_sm")
-phrase_matcher = PhraseMatcher(nlp.vocab, attr="LOWER")
+app = FastAPI(title="SchoolBridge NLP Service", version="0.2.0")
 
 SCHOOL_TERMS: dict[str, list[str]] = {
     "dismissal": ["early dismissal", "early release", "half day"],
@@ -33,9 +28,11 @@ SCHOOL_TERMS: dict[str, list[str]] = {
     ],
 }
 
-for label, terms in SCHOOL_TERMS.items():
-    patterns = [nlp.make_doc(t) for t in terms]
-    phrase_matcher.add(label.upper(), patterns)
+# Pre-compile patterns for each category
+_CATEGORY_PATTERNS: dict[str, re.Pattern] = {
+    label: re.compile("|".join(re.escape(t) for t in terms), re.IGNORECASE)
+    for label, terms in SCHOOL_TERMS.items()
+}
 
 DAY_PATTERN = re.compile(
     r"\b(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday"
@@ -44,6 +41,26 @@ DAY_PATTERN = re.compile(
 )
 
 TIME_INDICATORS = {"am", "pm", ":", "o'clock", "noon", "midnight"}
+
+# Date-like expressions to extract from text
+DATE_EXPR = re.compile(
+    r"(?:"
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+\d{1,2}(?:\s*,?\s*\d{4})?"
+    r"|"
+    r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\b(?:\s*,?\s*"
+    r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+\d{1,2})?"
+    r"|"
+    r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b"
+    r"|"
+    r"\b(?:today|tomorrow|tonight|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+    r"|week|month))\b"
+    r"|"
+    r"\b(?:this|next)\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b"
+    r")",
+    re.IGNORECASE,
+)
 
 
 class ExtractRequest(BaseModel):
@@ -69,34 +86,23 @@ class ExtractResponse(BaseModel):
     photos: list[ExtractedPhoto]
 
 
-def classify_category(doc: spacy.tokens.Doc) -> str:
-    """Determine the school event category from PhraseMatcher results."""
-    matches = phrase_matcher(doc)
-    if not matches:
-        return "general"
-    categories = {nlp.vocab.strings[match_id] for match_id, _, _ in matches}
-    # Priority order: closure > dismissal > admin > special > general
-    for priority in ["CLOSURE", "DISMISSAL", "ADMIN", "SPECIAL"]:
-        if priority in categories:
-            return priority.lower()
+def classify_category(text: str) -> str:
+    """Determine the school event category from keyword matching."""
+    for priority in ["closure", "dismissal", "admin", "special"]:
+        if _CATEGORY_PATTERNS[priority].search(text):
+            return priority
     return "general"
 
 
-def extract_title(doc: spacy.tokens.Doc, body: str) -> str:
+def extract_title(text: str) -> str:
     """Extract a reasonable event title from the text."""
-    # Use the first noun chunk as the title
-    chunks = list(doc.noun_chunks)
-    if chunks:
-        title = chunks[0].text.strip()
-        if len(title) > 5:
-            return title.title()
-    # Fall back to first sentence or first 60 chars
-    first_sentence = body.split(".")[0].strip()
-    return first_sentence[:60] if first_sentence else body[:60]
+    first_sentence = text.split(".")[0].strip()
+    title = first_sentence[:60] if first_sentence else text[:60]
+    return title.strip().title() if len(title) > 3 else title.strip()
 
 
-def is_valid_date_entity(text: str) -> bool:
-    """Filter out weak date matches (e.g., 'see you', 'thanks')."""
+def is_valid_date_text(text: str) -> bool:
+    """Filter out weak date matches."""
     return len(text) >= 3 and bool(DAY_PATTERN.search(text))
 
 
@@ -112,14 +118,13 @@ async def extract_events(req: ExtractRequest) -> ExtractResponse:
     if not req.text.strip():
         return ExtractResponse(events=[], photos=[])
 
-    doc = nlp(req.text)
-    category = classify_category(doc)
-    title = extract_title(doc, req.text)
+    category = classify_category(req.text)
+    title = extract_title(req.text)
 
-    # Collect date candidates from spaCy NER
+    # Extract date candidates via regex
     date_texts: list[str] = [
-        ent.text for ent in doc.ents
-        if ent.label_ == "DATE" and is_valid_date_entity(ent.text)
+        m.group() for m in DATE_EXPR.finditer(req.text)
+        if is_valid_date_text(m.group())
     ]
 
     # Fallback: use dateparser's search_dates
@@ -130,7 +135,7 @@ async def extract_events(req: ExtractRequest) -> ExtractResponse:
                 req.text, settings={"PREFER_DATES_FROM": "future"}
             ) or []
             date_texts = [
-                text for text, _ in found if is_valid_date_entity(text)
+                text for text, _ in found if is_valid_date_text(text)
             ]
         except Exception:
             pass
@@ -139,7 +144,6 @@ async def extract_events(req: ExtractRequest) -> ExtractResponse:
     seen_dates: set[str] = set()
 
     for raw_date in date_texts:
-        # Deduplicate
         if raw_date.lower() in seen_dates:
             continue
         seen_dates.add(raw_date.lower())
@@ -185,4 +189,4 @@ async def extract_events(req: ExtractRequest) -> ExtractResponse:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model": "en_core_web_sm"}
+    return {"status": "ok", "engine": "regex+dateparser"}

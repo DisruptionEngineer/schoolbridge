@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { inngest } from "@schoolbridge/jobs";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Vercel cron handler — triggers the ClassDojo polling job.
  * Configured in vercel.json to run every 15 minutes.

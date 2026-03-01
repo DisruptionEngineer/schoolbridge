@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await db
     .from("sync_events")
-    .update(updatePayload)
+    .update(updatePayload as never)
     .eq("id", eventId)
     .eq("tenant_id", tenantId);
 

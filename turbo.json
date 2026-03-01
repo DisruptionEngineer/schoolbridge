@@ -3,7 +3,17 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "CRON_SECRET",
+        "NLP_SERVICE_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "INNGEST_EVENT_KEY",
+        "INNGEST_SIGNING_KEY"
+      ]
     },
     "dev": {
       "persistent": true,
