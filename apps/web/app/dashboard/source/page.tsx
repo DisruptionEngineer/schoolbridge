@@ -44,7 +44,7 @@ export default async function SourcePage() {
               <li>
                 Find the cookie named{" "}
                 <code className="text-xs bg-[hsl(var(--background))] px-1.5 py-0.5 rounded">
-                  dojo_log_session_id
+                  dojo_home_login.sid
                 </code>
               </li>
               <li>Copy the value and paste it below</li>

@@ -14,34 +14,36 @@ async function getSupabase() {
 
 // ─── ClassDojo Source ────────────────────────────────────────
 
-export async function saveClassDojoSource(formData: FormData) {
-  const db = await getSupabase();
-  const sessionCookie = formData.get("session_cookie") as string;
-  const studentIdsRaw = formData.get("student_ids") as string;
-  const studentIds = studentIdsRaw
-    ? studentIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
+export async function saveClassDojoSource(
+  sessionCookie: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const db = await getSupabase();
 
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+    const {
+      data: { user },
+    } = await db.auth.getUser();
+    if (!user) return { success: false, error: "Not authenticated" };
 
-  const tenantId = user.app_metadata?.tenant_id;
-  if (!tenantId) throw new Error("No tenant assigned");
+    const tenantId = user.app_metadata?.tenant_id;
+    if (!tenantId) return { success: false, error: "No tenant assigned" };
 
-  const { error } = await db.from("classdojo_sources").upsert(
-    {
-      tenant_id: tenantId,
-      session_cookie: sessionCookie,
-      student_ids: studentIds,
-      enabled: true,
-    },
-    { onConflict: "tenant_id" },
-  );
+    const { error } = await db.from("classdojo_sources").upsert(
+      {
+        tenant_id: tenantId,
+        session_cookie: sessionCookie,
+        student_ids: [],
+        enabled: true,
+      },
+      { onConflict: "tenant_id" },
+    );
 
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/source");
+    if (error) return { success: false, error: error.message };
+    revalidatePath("/dashboard/source");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
 }
 
 // ─── Sync Connections ────────────────────────────────────────
