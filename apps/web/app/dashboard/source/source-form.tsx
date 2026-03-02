@@ -71,7 +71,7 @@ export function SourceConfigForm({
           type="password"
           value={cookie}
           onChange={(e) => setCookie(e.target.value)}
-          placeholder="Paste dojo_log_session_id value..."
+          placeholder="Paste dojo_home_login.sid cookie value..."
           className="mt-1 flex h-10 w-full rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-4 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring)/0.20)] focus-visible:border-[hsl(var(--primary))]"
           required
           minLength={10}

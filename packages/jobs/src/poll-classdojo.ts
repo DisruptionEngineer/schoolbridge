@@ -47,7 +47,7 @@ export const pollClassDojo = inngest.createFunction(
           const resp = await fetch(`${CLASSDOJO_FEED_URL}?${params}`, {
             headers: {
               ...CLASSDOJO_HEADERS,
-              cookie: `dojo_log_session_id=${source.session_cookie}`,
+              cookie: `dojo_home_login.sid=${source.session_cookie}`,
             },
           });
 
