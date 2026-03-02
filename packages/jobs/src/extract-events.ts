@@ -33,7 +33,11 @@ export const extractEvents = inngest.createFunction(
       const resp = await fetch(`${NLP_SERVICE_URL}/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: post.body ?? "", post_id: post._id }),
+        // ClassDojo puts body text in contents.body, not top-level body
+        body: JSON.stringify({
+          text: post.contents?.body ?? post.body ?? "",
+          post_id: post._id,
+        }),
       });
 
       if (!resp.ok) {
@@ -55,7 +59,7 @@ export const extractEvents = inngest.createFunction(
         category: e.category,
         status: "pending" as const,
         event_hash: computeEventHash(e.title, e.iso_date),
-        raw_body: (post.body ?? "").slice(0, 500),
+        raw_body: (post.contents?.body ?? post.body ?? "").slice(0, 500),
       }));
 
       if (!events.length) return [];

@@ -120,9 +120,11 @@ export interface NLPExtractionResult {
 /** ClassDojo feed item shape (from unofficial API) */
 export interface ClassDojoPost {
   _id: string;
-  time: number;
+  time: number | string;
   body?: string;
+  senderName?: string;
   contents?: {
+    body?: string;
     attachments?: Array<{
       path: string;
       type?: string;

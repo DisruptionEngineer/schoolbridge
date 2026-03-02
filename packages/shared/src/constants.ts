@@ -31,14 +31,19 @@ export const EVENT_CATEGORY_COLORS: Record<string, number> = {
 export const IMMICH_DEVICE_ID = "schoolbridge-sync";
 
 export const SCHOOL_EVENT_TERMS: Record<string, string[]> = {
-  dismissal: ["early dismissal", "early release", "half day"],
-  closure: ["school closed", "snow day", "weather closure", "no school"],
+  dismissal: ["early dismissal", "early release", "half day", "late start"],
+  closure: ["school closed", "snow day", "weather closure", "no school",
+            "spring break", "winter break", "fall break"],
   special: [
     "spirit week", "field trip", "field day", "picture day",
     "class photo", "pajama day", "hat day", "assembly", "pep rally",
+    "program", "concert", "performance", "show", "recital",
+    "food drive", "fundraiser", "book fair", "carnival",
+    "science fair", "art show", "talent show", "graduation",
   ],
   admin: [
     "parent conference", "parent-teacher conference", "ptc",
     "parent night", "open house", "back to school night",
+    "registration", "enrollment", "orientation",
   ],
 };

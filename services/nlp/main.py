@@ -18,15 +18,20 @@ from pydantic import BaseModel
 app = FastAPI(title="SchoolBridge NLP Service", version="0.3.0")
 
 SCHOOL_TERMS: dict[str, list[str]] = {
-    "dismissal": ["early dismissal", "early release", "half day"],
-    "closure": ["school closed", "snow day", "weather closure", "no school"],
+    "dismissal": ["early dismissal", "early release", "half day", "late start"],
+    "closure": ["school closed", "snow day", "weather closure", "no school",
+                "spring break", "winter break", "fall break"],
     "special": [
         "spirit week", "field trip", "field day", "picture day",
         "class photo", "pajama day", "hat day", "assembly", "pep rally",
+        "program", "concert", "performance", "show", "recital",
+        "food drive", "fundraiser", "book fair", "carnival",
+        "science fair", "art show", "talent show", "graduation",
     ],
     "admin": [
         "parent conference", "parent-teacher conference", "ptc",
         "parent night", "open house", "back to school night",
+        "registration", "enrollment", "orientation",
     ],
 }
 
@@ -42,17 +47,26 @@ DAY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Month names pattern — used for validating "Month DD" style date matches
+MONTH_PATTERN = re.compile(
+    r"\b(?:January|February|March|April|May|June|July|August|September"
+    r"|October|November|December)\b",
+    re.IGNORECASE,
+)
+
 TIME_INDICATORS = {"am", "pm", ":", "o'clock", "noon", "midnight"}
 
 # Date-like expressions to extract from text
+# Handles: "March 12th", "February 27", "March 12th, 2026", "Mon, March 12",
+#           "3/12", "3/12/2026", "today", "tomorrow", "next Monday", "this Friday"
 DATE_EXPR = re.compile(
     r"(?:"
     r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
-    r"\s+\d{1,2}(?:\s*,?\s*\d{4})?"
+    r"\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*\d{4})?"
     r"|"
     r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\b(?:\s*,?\s*"
     r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
-    r"\s+\d{1,2})?"
+    r"\s+\d{1,2}(?:st|nd|rd|th)?)?"
     r"|"
     r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b"
     r"|"
@@ -104,8 +118,14 @@ def extract_title(text: str) -> str:
 
 
 def is_valid_date_text(text: str) -> bool:
-    """Filter out weak date matches."""
-    return len(text) >= 3 and bool(DAY_PATTERN.search(text))
+    """Filter out weak date matches.
+
+    Accepts day names (Monday, Tue), month+day (March 12), numeric (3/12),
+    and relative dates (today, tomorrow, next Friday).
+    """
+    if len(text) < 3:
+        return False
+    return bool(DAY_PATTERN.search(text)) or bool(MONTH_PATTERN.search(text))
 
 
 def has_time_component(text: str) -> bool:

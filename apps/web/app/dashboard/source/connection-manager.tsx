@@ -11,6 +11,14 @@ type TestResult = {
   studentCount?: number;
 };
 
+type SyncResult = {
+  success?: boolean;
+  postsProcessed?: number;
+  eventsExtracted?: number;
+  log?: string[];
+  error?: string;
+};
+
 export function ConnectionManager({
   lastPolledAt,
 }: {
@@ -19,7 +27,10 @@ export function ConnectionManager({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [showReconnect, setShowReconnect] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const router = useRouter();
 
   async function handleTest() {
@@ -35,6 +46,25 @@ export function ConnectionManager({
       });
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/sync/trigger", {
+        method: "POST",
+      });
+      const data = await res.json();
+      setSyncResult(data);
+      if (data.success) {
+        router.refresh();
+      }
+    } catch {
+      setSyncResult({ error: "Failed to trigger sync" });
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -76,7 +106,7 @@ export function ConnectionManager({
               </p>
             ) : (
               <p className="text-xs text-emerald-600 mt-0.5">
-                Waiting for first sync (runs every 15 minutes)
+                Waiting for first sync &mdash; click &quot;Sync Now&quot; to run immediately
               </p>
             )}
           </div>
@@ -84,6 +114,32 @@ export function ConnectionManager({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-amber-400 bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+          >
+            {syncing ? (
+              <>
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Syncing...
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                </svg>
+                Sync Now
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={handleTest}
@@ -158,6 +214,44 @@ export function ConnectionManager({
                   ? ` (${testResult.studentCount} student${testResult.studentCount !== 1 ? "s" : ""})`
                   : ""}
               </p>
+            )}
+          </div>
+        )}
+
+        {/* Sync Result */}
+        {syncResult && (
+          <div
+            className={`rounded-lg p-3 text-sm ${
+              syncResult.success
+                ? "bg-blue-50 text-blue-800 border border-blue-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {syncResult.error ? (
+              <p className="font-medium">{syncResult.error}</p>
+            ) : (
+              <>
+                <p className="font-medium">
+                  Sync complete: {syncResult.postsProcessed ?? 0} posts processed,{" "}
+                  {syncResult.eventsExtracted ?? 0} events extracted
+                </p>
+                {syncResult.log && syncResult.log.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLog(!showLog)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {showLog ? "Hide" : "Show"} sync log ({syncResult.log.length} entries)
+                    </button>
+                    {showLog && (
+                      <pre className="mt-2 text-xs bg-blue-100 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
+                        {syncResult.log.join("\n")}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
