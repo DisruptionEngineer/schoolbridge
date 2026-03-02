@@ -148,7 +148,6 @@ export async function createConnection(formData: FormData) {
   const db = await getSupabase();
   const connectorType = formData.get("connector_type") as ConnectorType;
   const displayName = formData.get("display_name") as string;
-  const configJson = formData.get("config") as string;
 
   const {
     data: { user },
@@ -158,7 +157,13 @@ export async function createConnection(formData: FormData) {
   const tenantId = user.app_metadata?.tenant_id;
   if (!tenantId) throw new Error("No tenant assigned");
 
-  const config = JSON.parse(configJson);
+  // Assemble config from individual config_* form fields
+  const config: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("config_") && typeof value === "string") {
+      config[key.slice(7)] = value; // Remove "config_" prefix
+    }
+  }
 
   // Validate config using the connector
   const connector = connectorRegistry.get(connectorType);
