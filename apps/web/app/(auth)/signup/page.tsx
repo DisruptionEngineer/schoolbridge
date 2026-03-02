@@ -19,19 +19,38 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { tenant_name: tenantName },
-      },
-    });
+    try {
+      // Use server-side signup to auto-confirm email (no SMTP needed)
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, tenantName }),
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Signup failed");
+        setLoading(false);
+        return;
+      }
+
+      // User created & confirmed — now sign in to establish session
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+
       router.push("/dashboard/overview");
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
     }
   }
 
