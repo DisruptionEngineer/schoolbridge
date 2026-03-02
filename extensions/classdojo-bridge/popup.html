@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fffbf5;
+      color: #2d2013;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #8b7355;
+      margin-bottom: 16px;
+    }
+    .status-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .status-card.connected {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+    }
+    .status-card.disconnected {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.green { background: #10b981; }
+    .status-dot.red { background: #ef4444; }
+    .status-text {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #5c4a32;
+    }
+    input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d4c5a9;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fff;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus {
+      border-color: #c2956a;
+      box-shadow: 0 0 0 2px rgba(194, 149, 106, 0.2);
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: #c2956a;
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+    .message {
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+    .message.success {
+      background: #ecfdf5;
+      color: #065f46;
+    }
+    .message.error {
+      background: #fef2f2;
+      color: #991b1b;
+    }
+    .help {
+      font-size: 11px;
+      color: #8b7355;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .help a {
+      color: #c2956a;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>SchoolBridge</h1>
+  <p class="subtitle">ClassDojo Connector</p>
+
+  <div id="classdojo-status" class="status-card disconnected">
+    <span class="status-dot red" id="dojo-dot"></span>
+    <span class="status-text" id="dojo-text">Checking ClassDojo...</span>
+  </div>
+
+  <label for="api-key">API Key</label>
+  <input type="password" id="api-key" placeholder="Paste your SchoolBridge API key">
+
+  <button class="btn-primary" id="connect-btn" disabled>
+    Connect to SchoolBridge
+  </button>
+
+  <div id="message" class="message" style="display:none"></div>
+
+  <p class="help">
+    Find your API key in <a href="https://schoolbridge-bice.vercel.app/dashboard/settings" target="_blank">Dashboard &gt; Settings</a>
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,5 +1,10 @@
+export const CLASSDOJO_SESSION_URL =
+  "https://home.classdojo.com/api/session";
+
 export const CLASSDOJO_FEED_URL =
   "https://home.classdojo.com/api/storyFeed";
+
+export const CLASSDOJO_COOKIE_NAME = "dojo_home_login.sid";
 
 export const CLASSDOJO_HEADERS = {
   accept: "*/*",
