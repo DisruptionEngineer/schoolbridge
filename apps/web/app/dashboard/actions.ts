@@ -6,10 +6,97 @@ import { revalidatePath } from "next/cache";
 import { connectorRegistry } from "@schoolbridge/connectors";
 import { inngest } from "@schoolbridge/jobs";
 import type { ConnectorType } from "@schoolbridge/shared";
+import {
+  CLASSDOJO_SESSION_URL,
+  CLASSDOJO_HEADERS,
+  CLASSDOJO_COOKIE_NAME,
+} from "@schoolbridge/shared";
 
 async function getSupabase() {
   const cookieStore = await cookies();
   return createServerClient(cookieStore);
+}
+
+// ─── ClassDojo Connection Test ───────────────────────────────
+
+export async function testClassDojoConnection(): Promise<{
+  status: "connected" | "expired" | "no_source" | "error";
+  message: string;
+  parentName?: string;
+  studentCount?: number;
+}> {
+  try {
+    const db = await getSupabase();
+
+    const {
+      data: { user },
+    } = await db.auth.getUser();
+    if (!user)
+      return { status: "error", message: "Not authenticated." };
+
+    const tenantId = user.app_metadata?.tenant_id;
+    if (!tenantId)
+      return { status: "error", message: "No tenant assigned." };
+
+    const { data: source } = await db
+      .from("classdojo_sources")
+      .select("session_cookie, enabled")
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (!source || !source.session_cookie) {
+      return {
+        status: "no_source",
+        message: "No ClassDojo session configured. Go to ClassDojo Source to connect.",
+      };
+    }
+
+    // Verify cookie against ClassDojo API
+    const res = await fetch(
+      `${CLASSDOJO_SESSION_URL}?includeExtras=location`,
+      {
+        headers: {
+          ...CLASSDOJO_HEADERS,
+          cookie: `${CLASSDOJO_COOKIE_NAME}=${source.session_cookie}`,
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return {
+        status: "expired",
+        message: "ClassDojo session has expired. Please re-connect.",
+      };
+    }
+
+    // Parse session info for display
+    let parentName: string | undefined;
+    let studentCount: number | undefined;
+    try {
+      const session = await res.json();
+      const firstName = session.firstName || "";
+      const lastName = session.lastName || "";
+      parentName = `${firstName} ${lastName}`.trim() || undefined;
+      if (Array.isArray(session.children)) {
+        studentCount = session.children.length;
+      }
+    } catch {
+      // Non-critical, just skip display info
+    }
+
+    return {
+      status: "connected",
+      message: "ClassDojo session is active and working!",
+      parentName,
+      studentCount,
+    };
+  } catch (err) {
+    console.error("[Test Connection]", err);
+    return {
+      status: "error",
+      message: "Failed to test connection. Please try again.",
+    };
+  }
 }
 
 // ─── ClassDojo Source ────────────────────────────────────────

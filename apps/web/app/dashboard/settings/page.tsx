@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@schoolbridge/db";
+import { ExtensionApiKey } from "./extension-api-key";
+import { TestConnectionButton } from "./test-connection-button";
 
 export const metadata = { title: "Settings – SchoolBridge" };
 
@@ -14,6 +16,13 @@ export default async function SettingsPage() {
     .from("tenants")
     .select("name, plan, created_at")
     .single();
+
+  // Build extension API key (tenant_id:CRON_SECRET)
+  const cronSecret = process.env.CRON_SECRET;
+  const extensionApiKey =
+    typeof tenantId === "string" && cronSecret
+      ? `${tenantId}:${cronSecret}`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -66,6 +75,28 @@ export default async function SettingsPage() {
                 </dd>
               </div>
             </dl>
+          </div>
+        )}
+
+        {/* ClassDojo Connection Test */}
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-4">
+          <h2 className="text-lg font-semibold">ClassDojo Connection</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Verify that your stored ClassDojo session cookie is still valid and
+            SchoolBridge can reach the ClassDojo API.
+          </p>
+          <TestConnectionButton />
+        </div>
+
+        {/* Extension API Key */}
+        {extensionApiKey && (
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Chrome Extension</h2>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              Use this API key in the SchoolBridge Chrome Extension to automatically
+              sync your ClassDojo session cookie.
+            </p>
+            <ExtensionApiKey apiKey={extensionApiKey} />
           </div>
         )}
 

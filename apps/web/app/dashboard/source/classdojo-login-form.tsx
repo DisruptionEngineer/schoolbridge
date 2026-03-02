@@ -122,12 +122,23 @@ export function ClassDojoLoginForm() {
         <div className={`rounded-lg p-3 text-sm ${
           error.code === "RATE_LIMITED" || error.code === "ACCOUNT_LOCKED"
             ? "bg-amber-50 border border-amber-200 text-amber-800"
-            : "bg-red-50 border border-red-200 text-red-700"
+            : error.code === "OTC_REQUIRED"
+              ? "bg-blue-50 border border-blue-200 text-blue-700"
+              : "bg-red-50 border border-red-200 text-red-700"
         }`}>
           <p>{error.message}</p>
           {error.remainingAttempts !== undefined && error.remainingAttempts > 0 && (
             <p className="mt-1 text-xs opacity-75">
               {error.remainingAttempts} attempt{error.remainingAttempts !== 1 ? "s" : ""} remaining
+            </p>
+          )}
+          {error.code === "INVALID_CREDENTIALS" && (
+            <p className="mt-2 text-xs opacity-75">
+              Tip: Try logging in at{" "}
+              <a href="https://home.classdojo.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                classdojo.com
+              </a>{" "}
+              first to verify your password works. If it does, use the &quot;Manual Cookie&quot; tab as an alternative.
             </p>
           )}
         </div>
