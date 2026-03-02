@@ -1,10 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { createServerClient as createSSRClient } from "@supabase/ssr";
+import {
+  createBrowserClient as createSSRBrowserClient,
+  createServerClient as createSSRClient,
+} from "@supabase/ssr";
 import type { Database } from "./database.types";
 
-/** Browser client — uses anon key, respects RLS */
+/** Browser client — uses @supabase/ssr so auth tokens are stored in cookies (not localStorage) for middleware compatibility */
 export function createBrowserClient() {
-  return createClient<Database>(
+  return createSSRBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );

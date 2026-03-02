@@ -27,6 +27,8 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
+      // Refresh server state so middleware sees the new cookie, then navigate
+      router.refresh();
       router.push("/dashboard/overview");
     }
   }

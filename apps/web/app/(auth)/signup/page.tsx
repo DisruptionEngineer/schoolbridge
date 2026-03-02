@@ -47,6 +47,7 @@ export default function SignupPage() {
         return;
       }
 
+      router.refresh();
       router.push("/dashboard/overview");
     } catch {
       setError("Something went wrong. Please try again.");
