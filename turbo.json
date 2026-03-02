@@ -12,7 +12,8 @@
         "NLP_SERVICE_URL",
         "NEXT_PUBLIC_APP_URL",
         "INNGEST_EVENT_KEY",
-        "INNGEST_SIGNING_KEY"
+        "INNGEST_SIGNING_KEY",
+        "DISCORD_BOT_TOKEN"
       ]
     },
     "dev": {
