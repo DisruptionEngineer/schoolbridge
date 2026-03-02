@@ -115,15 +115,24 @@ export async function saveClassDojoSource(
     const tenantId = user.app_metadata?.tenant_id;
     if (!tenantId) return { success: false, error: "No tenant assigned" };
 
-    const { error } = await db.from("classdojo_sources").upsert(
-      {
-        tenant_id: tenantId,
-        session_cookie: sessionCookie,
-        student_ids: [],
-        enabled: true,
-      },
-      { onConflict: "tenant_id" },
-    );
+    // Check if a row already exists for this tenant
+    const { data: existing } = await db
+      .from("classdojo_sources")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    const { error } = existing
+      ? await db
+          .from("classdojo_sources")
+          .update({ session_cookie: sessionCookie, enabled: true })
+          .eq("tenant_id", tenantId)
+      : await db.from("classdojo_sources").insert({
+          tenant_id: tenantId,
+          session_cookie: sessionCookie,
+          student_ids: [],
+          enabled: true,
+        });
 
     if (error) return { success: false, error: error.message };
     revalidatePath("/dashboard/source");

@@ -160,15 +160,29 @@ export async function POST(request: NextRequest) {
 
     // ── Store cookie in database (service client to bypass RLS) ─
     const db = createServiceClient();
-    const { error: dbError } = await db.from("classdojo_sources").upsert(
-      {
-        tenant_id: tenantId,
-        session_cookie: sessionCookie,
-        student_ids: [],
-        enabled: true,
-      },
-      { onConflict: "tenant_id" },
-    );
+
+    // Check if a row already exists for this tenant
+    const { data: existing } = await db
+      .from("classdojo_sources")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    const dbError = existing
+      ? (
+          await db
+            .from("classdojo_sources")
+            .update({ session_cookie: sessionCookie, enabled: true })
+            .eq("tenant_id", tenantId)
+        ).error
+      : (
+          await db.from("classdojo_sources").insert({
+            tenant_id: tenantId,
+            session_cookie: sessionCookie,
+            student_ids: [],
+            enabled: true,
+          })
+        ).error;
 
     if (dbError) {
       return NextResponse.json<AuthResult>(

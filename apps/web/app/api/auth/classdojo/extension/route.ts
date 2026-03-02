@@ -84,16 +84,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store in database
-    const { error: dbError } = await db.from("classdojo_sources").upsert(
-      {
-        tenant_id: tenantId,
-        session_cookie: sessionCookie,
-        student_ids: [],
-        enabled: true,
-      },
-      { onConflict: "tenant_id" },
-    );
+    // Store in database (select-then-update/insert since no unique constraint on tenant_id)
+    const { data: existing } = await db
+      .from("classdojo_sources")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    const dbError = existing
+      ? (
+          await db
+            .from("classdojo_sources")
+            .update({ session_cookie: sessionCookie, enabled: true })
+            .eq("tenant_id", tenantId)
+        ).error
+      : (
+          await db.from("classdojo_sources").insert({
+            tenant_id: tenantId,
+            session_cookie: sessionCookie,
+            student_ids: [],
+            enabled: true,
+          })
+        ).error;
 
     if (dbError) {
       return NextResponse.json(
