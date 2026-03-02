@@ -5,8 +5,8 @@ import {
   CLASSDOJO_SESSION_URL,
   CLASSDOJO_HEADERS,
   CLASSDOJO_COOKIE_NAME,
+  extractSessionCookie,
 } from "@schoolbridge/shared";
-import { extractSessionCookie } from "@schoolbridge/shared/utils";
 
 export const dynamic = "force-dynamic";
 
